@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api', // Ajuste a porta se necessário
+  baseURL: 'http://localhost:3333/api',
 });
 
 // Este interceptor anexa o Token automaticamente em cada requisição
@@ -13,4 +13,5 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Essa é a linha que o Vite estava sentindo falta:
 export default api;

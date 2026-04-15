@@ -2,16 +2,15 @@ import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import StatsCard from '../common/StatsCard';
 
-const DashboardContent = () => {
+// Mudamos o nome para DashboardShell para bater com o App.jsx
+const DashboardShell = () => {
   const [stats, setStats] = useState({ totalStudents: 0, totalTrainings: 0, revenue: 0 });
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // 1. Recupera o nome do usuário que guardamos no Login
     const savedUser = JSON.parse(localStorage.getItem('@Fitzy:user'));
     setUser(savedUser);
 
-    // 2. Busca as métricas reais do back-end
     async function loadDashboardData() {
       try {
         const response = await api.get('/trainings/stats');
@@ -25,7 +24,7 @@ const DashboardContent = () => {
   }, []);
 
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-[#0e0e0e] p-8">
       <header className="mb-10">
         <h1 className="text-4xl font-black text-white italic tracking-tighter">
           OLÁ, <span className="text-[#8eff71] uppercase">{user?.name || 'TRAINER'}</span>
@@ -53,3 +52,6 @@ const DashboardContent = () => {
     </div>
   );
 };
+
+// A exportação padrão que o Vite precisa:
+export default DashboardShell;
