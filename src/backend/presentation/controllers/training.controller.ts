@@ -3,70 +3,104 @@ import { z } from 'zod';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { AuthenticatedRequest } from '../../infrastructure/http/middlewares/auth.middleware.js';
 
-// Schema validation using Zod
+// Validação dos dados de treino (Ajustado para o seu Schema)
 const CreateTrainingSchema = z.object({
-  name: z.string().min(3),
+  title: z.string().min(3),
   description: z.string().optional(),
-  student_id: z.string().uuid().optional(),
-  is_template: z.boolean().default(false),
+  studentId: z.string().uuid().nullable().optional(),
+  isTemplate: z.boolean().default(false),
   exercises: z.array(
     z.object({
-      exercise_id: z.string().uuid(),
+      name: z.string().min(2),
+      muscleGroup: z.string().optional(),
       sets: z.number().int().min(1),
       reps: z.string(),
-      rest_seconds: z.number().int().min(0),
-      order_index: z.number().int().min(0),
+      restTime: z.string().optional(),
+      mediaUrl: z.string().url().optional(),
     })
   ).min(1),
 });
 
 export class TrainingController {
   /**
-   * Creates a new training program (either a template or assigned to a student)
+   * Busca estatísticas reais para o Dashboard (Métricas do Personal)
+   */
+  async getStats(req: AuthenticatedRequest, res: Response) {
+    try {
+      const personalId = req.user?.id;
+
+      if (!personalId) {
+        return res.status(401).json({ error: 'Não autorizado' });
+      }
+
+      // Executa as contagens em paralelo para performance
+      const [totalStudents, totalTrainings] = await Promise.all([
+        prisma.user.count({ 
+          where: { 
+            role: 'STUDENT',
+            trainingsRec: { some: { personalId } } 
+          } 
+        }),
+        prisma.training.count({ where: { personalId } })
+      ]);
+
+      return res.status(200).json({
+        totalStudents,
+        totalTrainings,
+        activePlans: totalStudents,
+        revenue: totalStudents * 150 // Valor simbólico de mensalidade
+      });
+    } catch (error) {
+      console.error('[TrainingController.getStats] Error:', error);
+      return res.status(500).json({ error: 'Erro interno ao buscar estatísticas' });
+    }
+  }
+
+  /**
+   * Cria um novo programa de treino (Corrigido para camelCase e tabela Exercise)
    */
   async createTraining(req: AuthenticatedRequest, res: Response) {
     try {
-      const trainerId = req.user?.id;
+      const personalId = req.user?.id;
       
-      if (!trainerId) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!personalId) {
+        return res.status(401).json({ error: 'Não autorizado' });
       }
 
-      // 1. Validate input
       const parsedBody = CreateTrainingSchema.safeParse(req.body);
       
       if (!parsedBody.success) {
         return res.status(400).json({ 
-          error: 'Validation failed', 
+          error: 'Falha na validação', 
           details: parsedBody.error.format() 
         });
       }
 
       const data = parsedBody.data;
 
-      // 2. Execute Transaction (Create Training + Link Exercises)
       const newTraining = await prisma.$transaction(async (tx) => {
-        // Create the base training record
+        // 1. Cria o registro base do Treino
         const training = await tx.training.create({
           data: {
-            trainer_id: trainerId,
-            student_id: data.student_id || null,
-            name: data.name,
+            personalId: personalId,
+            studentId: data.studentId || null,
+            title: data.title,
             description: data.description,
-            is_template: data.is_template,
+            isTemplate: data.isTemplate,
           },
         });
 
-        // Link exercises to the training
+        // 2. Cria os exercícios vinculados diretamente (conforme seu Schema)
         if (data.exercises.length > 0) {
-          await tx.trainingExercise.createMany({
+          await tx.exercise.createMany({
             data: data.exercises.map((ex) => ({
-              training_id: training.id,
-              exercise_id: ex.exercise_id,
+              trainingId: training.id,
+              name: ex.name,
+              muscleGroup: ex.muscleGroup,
               sets: ex.sets,
               reps: ex.reps,
-              rest_seconds: ex.rest_seconds,
-              order_index: ex.order_index,
+              restTime: ex.restTime,
+              mediaUrl: ex.mediaUrl,
             })),
           });
         }
@@ -74,43 +108,39 @@ export class TrainingController {
         return training;
       });
 
-      // 3. Return success response
       return res.status(201).json({
-        message: 'Training created successfully',
+        message: 'Treino criado com sucesso!',
         data: newTraining,
       });
 
     } catch (error) {
       console.error('[TrainingController.createTraining] Error:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
   /**
-   * Example of a PostGIS raw query for finding nearby trainers
-   * This would typically be in a ProfileController, but placed here to demonstrate the requirement.
+   * Busca personais próximos via PostGIS (Geolocalização)
    */
   async findNearbyTrainers(req: AuthenticatedRequest, res: Response) {
     try {
       const { lat, lng, radius_km = 10 } = req.query;
 
       if (!lat || !lng) {
-        return res.status(400).json({ error: 'Latitude and Longitude are required' });
+        return res.status(400).json({ error: 'Latitude e Longitude são obrigatórias' });
       }
 
-      // PostGIS ST_DWithin uses meters for Geography type
       const radiusMeters = Number(radius_km) * 1000;
 
-      // Raw query to utilize PostGIS spatial index
       const nearbyTrainers = await prisma.$queryRaw`
         SELECT 
           p.id, 
-          p.full_name, 
+          u.name, 
           p.specialties,
           ST_Distance(p.location, ST_MakePoint(${Number(lng)}, ${Number(lat)})::geography) as distance_meters
         FROM profiles p
         JOIN users u ON p.user_id = u.id
-        WHERE u.role = 'trainer'
+        WHERE u.role = 'PERSONAL'
           AND ST_DWithin(
             p.location, 
             ST_MakePoint(${Number(lng)}, ${Number(lat)})::geography, 
@@ -123,7 +153,7 @@ export class TrainingController {
       return res.status(200).json({ data: nearbyTrainers });
     } catch (error) {
       console.error('[TrainingController.findNearbyTrainers] Error:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 }

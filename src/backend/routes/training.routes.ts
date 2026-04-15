@@ -22,4 +22,7 @@ router.get(
   trainingController.findNearbyTrainers.bind(trainingController)
 );
 
+// Buscar estatísticas do Dashboard
+router.get('/stats', trainingController.getStats.bind(trainingController));
+
 export default router;

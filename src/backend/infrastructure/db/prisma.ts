@@ -1,12 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
-// Singleton pattern to avoid multiple instances in development
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const { PrismaClient } = pkg;
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: ['query', 'error', 'warn'],
-  });
+// Configura o pool de conexão do PostgreSQL
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// Instancia o cliente usando o adapter (Padrão Prisma 7)
+export const prisma = new PrismaClient({ adapter });
