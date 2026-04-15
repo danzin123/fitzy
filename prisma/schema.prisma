@@ -1,8 +1,65 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
-  // A linha 'url' foi removida daqui
+}
+
+// === TABELAS DO FITZY ===
+
+enum Role {
+  PERSONAL
+  STUDENT
+  ADMIN
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(PERSONAL)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relacionamentos: Um personal tem vários treinos criados
+  trainingsRec Training[] @relation("PersonalTrainings")
+  
+  // Relacionamentos: Um aluno tem vários treinos recebidos
+  trainings    Training[] @relation("StudentTrainings")
+}
+
+model Training {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  isTemplate  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Chaves estrangeiras
+  personalId  String
+  personal    User       @relation("PersonalTrainings", fields: [personalId], references: [id])
+  
+  studentId   String?
+  student     User?      @relation("StudentTrainings", fields: [studentId], references: [id])
+
+  // Um treino tem vários exercícios
+  exercises   Exercise[]
+}
+
+model Exercise {
+  id          String   @id @default(uuid())
+  name        String
+  muscleGroup String?
+  sets        Int
+  reps        String
+  restTime    String?
+  mediaUrl    String?  // Link para gif/vídeo de como fazer
+  
+  // Chave estrangeira ligando ao Treino
+  trainingId  String
+  training    Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage'; // <-- Importamos a tela de cadastro
 import DashboardShell from './components/layout/DashboardShell';
 
 // Componente simples de proteção
@@ -16,6 +17,9 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Adicionamos a rota do Register aqui: */}
+        <Route path="/register" element={<RegisterPage />} />
         
         {/* Rota Protegida do Dashboard */}
         <Route path="/dashboard" element={

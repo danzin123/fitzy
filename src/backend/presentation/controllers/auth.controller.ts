@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../../infrastructure/db/prisma';
+import { prisma } from '../../infrastructure/db/prisma.js';
 
 export class AuthController {
   async register(req: Request, res: Response) {
@@ -33,6 +33,8 @@ export class AuthController {
         email: user.email,
       });
     } catch (error) {
+      // AGORA O SERVIDOR VAI GRITAR O ERRO NO TERMINAL!
+      console.error('❌ [ERRO NO CADASTRO]:', error);
       return res.status(500).json({ error: 'Erro ao registrar usuário.' });
     }
   }
@@ -70,6 +72,7 @@ export class AuthController {
         token,
       });
     } catch (error) {
+      console.error('❌ [ERRO NO LOGIN]:', error);
       return res.status(500).json({ error: 'Erro ao realizar login.' });
     }
   }
